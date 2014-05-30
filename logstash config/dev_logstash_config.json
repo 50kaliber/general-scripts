@@ -1,0 +1,51 @@
+input {
+   file {
+      path => "/var/log/apache2/*.ls_json"
+      tags => "apache_json"
+      codec => "json"
+   }
+}
+
+filter {
+    geoip {
+	add_tag => [ "GeoIP" ]
+	database => "/opt/logstash/GeoLiteCity.dat"
+	source => "clientip"
+    }
+    if [useragent] != "-" and [useragent] != "" {
+      useragent {
+        add_tag => [ "UA" ]
+        source => "useragent"
+      }
+    }
+    if [bytes] == 0 { mutate { remove => "[bytes]" } }
+    if [geoip][city_name]      == "" { mutate { remove => "[geoip][city_name]" } }
+    if [geoip][continent_code] == "" { mutate { remove => "[geoip][continent_code]" } }
+    if [geoip][country_code2]  == "" { mutate { remove => "[geoip][country_code2]" } }
+    if [geoip][country_code3]  == "" { mutate { remove => "[geoip][country_code3]" } }
+    if [geoip][country_name]   == "" { mutate { remove => "[geoip][country_name]" } }
+    if [geoip][latitude]       == "" { mutate { remove => "[geoip][latitude]" } }
+    if [geoip][longitude]      == "" { mutate { remove => "[geoip][longitude]" } }
+    if [geoip][postal_code]    == "" { mutate { remove => "[geoip][postal_code]" } }
+    if [geoip][region_name]    == "" { mutate { remove => "[geoip][region_name]" } }
+    if [geoip][time_zone]      == "" { mutate { remove => "[geoip][time_zone]" } }
+    if [urlquery]              == "" { mutate { remove => "urlquery" } }
+
+    if "apache_json" in [tags] {
+        if [method]    =~ "(HEAD|OPTIONS)" { mutate { remove => "method" } }
+        if [useragent] == "-"              { mutate { remove => "useragent" } }
+        if [referer]   == "-"              { mutate { remove => "referer" } }
+    }
+    if "UA" in [tags] {
+        if [device] == "Other" { mutate { remove => "device" } }
+        if [name]   == "Other" { mutate { remove => "name" } }
+        if [os]     == "Other" { mutate { remove => "os" } }
+    }
+}
+
+output {
+     elasticsearch {
+       host => "elasticsearch.example.com"
+       cluster => "elasticsearch"
+     }
+}

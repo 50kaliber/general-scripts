@@ -1,0 +1,44 @@
+input {
+	udp	{
+		type => "pound"
+		port => 5514
+	}
+}
+
+filter {
+	grep {
+		match => [ "message", "(?!.*RumpusCompleteQuery)pound:" ]
+		drop => true
+		}       
+                
+	grok {
+        match => [ "message", "%{SYSLOGBASE} %{COMBINEDAPACHELOG:message}" ]
+        overwrite => [ "message", "%{COMBINEDAPACHELOG}" ]
+        }
+
+		if [clientip]  {
+			geoip {
+				source => "clientip"
+				database => "/etc/logstash/GeoLiteCity.dat"
+				target => "geoip"
+				add_field => [ "[geoip][coordinates]", "%{[geoip][longitude]}" ]
+				add_field => [ "[geoip][coordinates]", "%{[geoip][latitude]}"  ]
+			}
+			mutate {
+				convert => [ "[geoip][coordinates]", "float" ]
+			}
+		}
+			
+		if [agent] != "-" and [agent] != "" {
+			useragent {
+				source => "agent"
+			}
+		}
+}
+
+
+output {
+	elasticsearch {
+		host => "127.0.0.1"
+	}
+}
